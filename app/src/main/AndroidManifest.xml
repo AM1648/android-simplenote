@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- optional but useful for detecting connectivity -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -13,6 +15,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.SimpleNote"
         tools:targetApi="31">
+        <activity android:name=".LoginActivity" />
+        <activity android:name=".RegisterActivity" />
+        <activity android:name=".HomeActivity" />
+        <activity android:name=".SettingsActivity" />
+        <activity android:name=".ChangePasswordActivity" />
+        <activity android:name=".notes.NoteActivity" />
+        <activity android:name=".notes.NotesHomeActivity" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -20,7 +29,6 @@
             android:theme="@style/Theme.SimpleNote">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

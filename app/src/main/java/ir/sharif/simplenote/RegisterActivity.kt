@@ -1,13 +1,15 @@
 package ir.sharif.simplenote
 
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,22 +29,70 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.sharif.simplenote.auth.AuthUiState
+import ir.sharif.simplenote.auth.AuthViewModel
+import ir.sharif.simplenote.auth.AuthViewModelFactory
 
-class Login  : ComponentActivity() {
+class RegisterActivity : ComponentActivity() {
+
+    private val viewModel: AuthViewModel by viewModels { AuthViewModelFactory(applicationContext) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                RegisterScreen(
-                    onBack = { finish() },
-                    onLoginClick = { finish() }, // navigate to Login if you have NavController
-                    onSubmit = { /* handle submit */ }
-                )
+                val regState by viewModel.registerState.collectAsState()
+                val context = LocalContext.current
+
+                Box(Modifier.fillMaxSize()) {
+                    RegisterScreen(
+                        onBack = { finish() },
+                        onLoginClick = {
+                            val intent = Intent(context, LoginActivity::class.java).apply {
+                                putExtra("message", "Hello from MainActivity")
+                            }
+                            context.startActivity(intent)
+                            finish()
+                        },
+                        onSubmit = { form ->
+                            // quick client-side check
+                            if (form.password != form.retype) {
+                                // show something in your UI instead if you prefer
+                                // e.g., a Snackbar; keeping it minimal here:
+                                return@RegisterScreen
+                            }
+                            // Uses the provided ViewModel as requested
+                            viewModel.register(
+                                username = form.username,
+                                email = form.email,
+                                password = form.password
+                            )
+                        }
+                    )
+
+                    // super lightweight feedback (optional)
+                    when (val s = regState) {
+                        AuthUiState.Loading -> {
+                            CircularProgressIndicator(Modifier.align(Alignment.Center))
+                        }
+
+                        is AuthUiState.Error -> {
+                            Text(
+                                text = s.message,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(16.dp)
+                            )
+                        }
+
+                        else -> Unit
+                    }
+                }
             }
         }
     }
@@ -85,7 +135,11 @@ fun RegisterScreen(
                         .padding(top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFF6C5CE7))
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color(0xFF6C5CE7)
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         "Back to Login",
@@ -100,12 +154,21 @@ fun RegisterScreen(
                 Column(Modifier.fillMaxWidth()) {
                     Text(
                         text = "Register",
-                        style = TextStyle(fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF180E25))
+                        style = TextStyle(
+                            fontSize = 32.sp,
+                            lineHeight = 38.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF180E25)
+                        )
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "And start taking notes",
-                        style = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, color = Color(0xFF827D89))
+                        style = TextStyle(
+                            fontSize = 16.sp,
+                            lineHeight = 22.sp,
+                            color = Color(0xFF827D89)
+                        )
                     )
                 }
             }
@@ -181,7 +244,16 @@ fun RegisterScreen(
                 Button(
                     onClick = {
                         focus.clearFocus()
-                        onSubmit(RegisterForm(firstName, lastName, username, email, password, retype))
+                        onSubmit(
+                            RegisterForm(
+                                firstName,
+                                lastName,
+                                username,
+                                email,
+                                password,
+                                retype
+                            )
+                        )
                     },
                     modifier = Modifier
                         .fillMaxWidth()

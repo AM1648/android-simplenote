@@ -1,9 +1,11 @@
 package ir.sharif.simplenote
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
@@ -26,22 +28,101 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import ir.sharif.simplenote.auth.AuthUiState
+import ir.sharif.simplenote.auth.AuthViewModel
+import ir.sharif.simplenote.auth.AuthViewModelFactory
+import ir.sharif.simplenote.notes.NotesHomeActivity
+
+// imports unchanged…
 
 class LoginActivity : ComponentActivity() {
+    private val viewModel: AuthViewModel by viewModels { AuthViewModelFactory(applicationContext) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ApiClient.initialize(this)
         enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                LoginScreen(
-                    onLogin = { /* TODO: auth */ },
-                    onRegisterClick = { /* TODO: navigate to Register */ }
-                )
+                val loginState by viewModel.loginState.collectAsState()
+                val registerState by viewModel.registerState.collectAsState()
+                val snackbarHostState = remember { SnackbarHostState() }
+
+                val context = LocalContext.current
+                // Handle login results
+                LaunchedEffect(loginState) {
+                    when (val s = loginState) {
+                        is AuthUiState.Error -> snackbarHostState.showSnackbar(s.message)
+                        is AuthUiState.Success -> {
+                            // You now have s.tokens (access/refresh) and s.me (UserInfo).
+                            // TODO: navigate to Home
+                            // startActivity(Intent(this@LoginActivity, HomeActivity::class.java)); finish()
+                            val intent = Intent(context, NotesHomeActivity::class.java).apply {
+                                putExtra("message", "Hello from MainActivity")
+                            }
+                            context.startActivity(intent)
+                        }
+
+                        else -> Unit
+                    }
+                }
+
+                // Handle register results
+                LaunchedEffect(registerState) {
+                    when (val s = registerState) {
+                        is AuthUiState.Error -> snackbarHostState.showSnackbar(s.message)
+                        AuthUiState.Idle -> { /* noop */
+                        }
+
+                        AuthUiState.Loading -> { /* noop */
+                        }
+
+                        is AuthUiState.PasswordChanged -> { /* noop */
+                        }
+
+                        is AuthUiState.Success -> {
+                            // In our ViewModel we don't set Success for register (we set Idle on success).
+                            // If you later decide to emit Success with user data, handle it here.
+                        }
+                    }
+                }
+
+                // One loader for either flow
+                val isBusy =
+                    loginState is AuthUiState.Loading || registerState is AuthUiState.Loading
+
+                Scaffold(
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                    contentWindowInsets = WindowInsets(0)
+                ) { innerPadding ->
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                    ) {
+                        val context = LocalContext.current
+                        LoginScreen(
+                            onLogin = { form ->
+                                viewModel.login(form.email, form.password)
+                            },
+                            onRegister = { form ->
+                                val intent = Intent(context, RegisterActivity::class.java).apply {
+                                    putExtra("message", "Hello from MainActivity")
+                                }
+                                context.startActivity(intent)
+                            }
+                        )
+
+                        if (isBusy) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -50,7 +131,7 @@ class LoginActivity : ComponentActivity() {
 @Composable
 fun LoginScreen(
     onLogin: (LoginForm) -> Unit,
-    onRegisterClick: () -> Unit
+    onRegister: (LoginForm) -> Unit
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
@@ -70,7 +151,7 @@ fun LoginScreen(
                 contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(30.dp)
             ) {
-                // Title + subtitle
+                // Title
                 item {
                     Column(Modifier.fillMaxWidth()) {
                         Text(
@@ -149,25 +230,19 @@ fun LoginScreen(
                     }
                 }
 
-                // Divider with "Or"
+                // Divider
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Divider(
-                            modifier = Modifier.weight(1f),
-                            color = Color(0xFFE6E3EA)
-                        )
+                        Divider(modifier = Modifier.weight(1f), color = Color(0xFFE6E3EA))
                         Text(
                             "  Or  ",
                             color = Color(0xFF827D89),
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        Divider(
-                            modifier = Modifier.weight(1f),
-                            color = Color(0xFFE6E3EA)
-                        )
+                        Divider(modifier = Modifier.weight(1f), color = Color(0xFFE6E3EA))
                     }
                 }
 
@@ -177,15 +252,15 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "Don’t have any account? ",
-                            color = Color(0xFF6D6A75)
-                        )
+                        Text("Don’t have any account? ", color = Color(0xFF6D6A75))
                         Text(
                             text = "Register here",
                             color = Color(0xFF6C5CE7),
                             textDecoration = TextDecoration.Underline,
-                            modifier = Modifier.clickable { onRegisterClick() }
+                            modifier = Modifier.clickable {
+                                focus.clearFocus()
+                                onRegister(LoginForm(email, password))
+                            }
                         )
                     }
                 }
